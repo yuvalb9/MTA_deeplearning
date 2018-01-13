@@ -8,8 +8,11 @@ def sigmoid(z, prime=False):
     return 1.0/(1.0 + np.exp(-1.0 * z))
 
 
+
+
+
 class Layer():
-    def __init__(self, layer_name, input_size, layer_size, activation_function, weight_initializer=np.zeros):
+    def __init__(self, layer_name, input_size, layer_size, activation_function, weight_initializer=np.random.random):
         self.weight_initializer = weight_initializer
         self.input_size = input_size + 1 # added 1 for bias
         self.layer_size = layer_size
@@ -60,24 +63,44 @@ class FCNN():
         return layers_output
 
 
-    def train_single(self, x, target, learning_rate = 0.1):
+    def train_single(self, x, target, learning_rate = 0.01):
         layers_output = self.feed_forward(x)
         out = layers_output[-1]
         cost = self.cost_func(out, target)
 
-        #print ("x:", x)
-        #print ("out:", out)
-        #print ("target:", target)
-        #print ("cost:", cost)
 
         layers_deltas = self.backpropogate(layers_output, target)
         print ("layers_deltas:",layers_deltas )
         print ("layers_output:", layers_output)
 
+        # calclate learning_rate * delta * activation_prime , for each weight matrix
         for i in range(len(layers_deltas)):
-            if i==0:
-                pass #learning_rate *
+            print ("self._layers[",i,"].weight: ", self._layers[i].weights.shape ," \n", self._layers[i].weights)
+            print ("layers_deltas[",i,"]: ", layers_deltas[i])
+            miu_delta = np.multiply(learning_rate, layers_deltas[i])
+            print ("miu_delta of layer ", i, ":", miu_delta)
 
+            input_from_last_layer = None
+            if i == 0: # We'll handle the input layer separately from the other layers
+                input_from_last_layer = x
+            else:
+                input_from_last_layer = layers_output[i-1]
+
+            print ("input of layer ", i, ":", input_from_last_layer)
+            # we need to append the Bias to the input layer
+            input_rows = input_from_last_layer.shape[0]
+            bias_and_input = np.concatenate([np.ones((input_rows, 1)), input_from_last_layer], axis=1)
+            prime_activation_on_input = self._layers[i].activation_function(bias_and_input, prime=True)
+
+            print ("bias_and_input of layer ", i, ":", bias_and_input)
+            print ("prime_activation_on_input of layer ", i, ":", prime_activation_on_input)
+
+            corrections = np.dot(miu_delta.T, prime_activation_on_input).T
+
+            print ("corrections of layer ", i, ":", corrections)
+
+            self._layers[i].weights += corrections
+            print ("new weights of layer ",i,":\n", self._layers[i].weights)
         return cost
 
     def backpropogate(self, layers_out, target):
@@ -112,26 +135,34 @@ class FCNN():
         layers_deltas.pop(0)        # there is no need for Delta for input layer.
         return layers_deltas
 
-def targetFunction(x,y,z):
-    return 3.0*x + 4.5*y - 5.0*z
+def targetFunction(x,y):
+    return 3.0*x + 4.5*y
+
+def generate_toy_sample():
+    x = [x * 20.0 - 10 for x in np.random.rand(100)]
+    y = [y * 20.0 - 10 for y in np.random.rand(100)]
+    labels= []
+    for i in range(100):
+        t = np.asmatrix(  targetFunction(x[i], y[i]) )
+        labels.append(t)
+
+    return x,y,labels
 
 
 if __name__ == '__main__':
-    inL = Layer("1st hidden", 3, 4, sigmoid, weight_initializer=np.random.random)
-    hidL = Layer("2st hidden", 4, 2, sigmoid, weight_initializer=np.random.random)
-    outL = Layer("output", 2, 1, sigmoid, weight_initializer=np.random.random)
+    np.random.seed(101) # will make sure we use the same randomized numbers
+    inL = Layer("1st hidden", 2, 4, sigmoid)
+    hidL = Layer("2st hidden", 4, 3, sigmoid)
+    outL = Layer("output", 3, 1, sigmoid)
 
     nn = FCNN([inL, hidL, outL], MSE)
 
-    x = [x*20.0-10 for x in np.random.rand(100)]
-    y = [y*20.0-10 for y in np.random.rand(100)]
-    z = [z*20.0-10 for z in np.random.rand(100)]
-    tgt = []
-    for i in range(100):
-        t =  np.array( [targetFunction(x[i], y[i], z[i]),] )
-        tgt.append( t )
+    x,y,tgt = generate_toy_sample()
 
-    t = tgt[0]
-    i=0
-    print ("train single:", nn.train_single(np.matrix([x[i],y[i],z[i]]), t))
+    print ("input:\n", [x[0],y[0]])
+    print ("label:", tgt[0])
+
+    print ("weight 1st hidden\n: ")
+
+    print ("****************train single:", nn.train_single(np.matrix([x[0],y[0]]), tgt[0]))
 
