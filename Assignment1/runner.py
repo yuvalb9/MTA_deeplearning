@@ -70,7 +70,7 @@ class FCNN():
         #print ("target:", target)
         #print ("cost:", cost)
 
-        layers_deltas = self.backpropogate(layers_output, cost)
+        layers_deltas = self.backpropogate(layers_output, target)
         print ("layers_deltas:",layers_deltas )
         print ("layers_output:", layers_output)
 
@@ -80,26 +80,36 @@ class FCNN():
 
         return cost
 
-    def backpropogate(self, layers_out, cost):
-        delta = cost
-        layers_deltas = [ delta ]
+    def backpropogate(self, layers_out, target):
+        '''
+        Calculates the Deltas for all layers
+        :param layers_out: the output of each layer, after the activation function
+        :param target: the label for the specific example, that generated the outputs
+        :return: a list of delta values for every layer.
+        '''
+        layers_deltas = []
+        tgt = np.asmatrix(target)   # change Vector to Matrix
+
+        # get the Delta of the output layer
+        out_delta =  tgt - layers_out[-1]
+        layers_deltas.append( out_delta )
+
+        print ("target: ", np.asmatrix(target))
+        print ("layers_out[-1]: ", layers_out[-1])
+        print ("out_delta:",out_delta)
         print("len(layers_out):",len(layers_out))
+
+        # now go over every hidden layer, and calculate Deltas for their neurons
         for i in range(len(layers_out)-1,0-1,-1):
-            print ("i", i)
-            curr_weights = self._layers[i].weights
+            curr_weights = self._layers[i].weights[1:,:] # the first delta is for the Bias, we dont push that down to
+                                                         # lower layers
 
-            print ("curr_weights:", curr_weights)
-            print ("layers_deltas[-1]:", layers_deltas[-1])
-            if len(layers_deltas[-1].shape)>1:
-                delta = np.dot( curr_weights, layers_deltas[-1][:,1:].T).T
-            else:
-                delta = np.dot(layers_deltas[-1], curr_weights.T)
+
+            delta = np.dot( curr_weights, layers_deltas[-1].T).T
             layers_deltas.append(delta)
-            print ("delta:", delta)
 
-
-        layers_deltas.reverse()
-        layers_deltas.pop(0)
+        layers_deltas.reverse()     # reverse order, because we worked form end to start in the BP stage
+        layers_deltas.pop(0)        # there is no need for Delta for input layer.
         return layers_deltas
 
 def targetFunction(x,y,z):
